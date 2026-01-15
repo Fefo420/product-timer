@@ -214,57 +214,48 @@ class ModernTimer(ctk.CTk):
                     self.after(0, lambda: ctk.CTkLabel(self.lb_scroll, text="No data yet.").pack())
                     return
 
-                # --- 2. AGGREGATE COMPLEX DATA ---
-                # Structure: 'Username': {'minutes': 120, 'tasks': 5, 'task_history': []}
+                # Structure: 'User': {'minutes': 0, 'tasks': 0, 'history': {}} <--- History is now a DICT
                 user_stats = {}
 
                 for entry in resp.values():
                     name = entry.get("username", "Unknown")
                     duration_str = entry.get("duration", "0 min")
+                    session_tasks = entry.get("tasks_done", []) 
+                    session_task_count = entry.get("task_count", 0) 
                     
-                    # Get tasks from this session
-                    session_tasks = entry.get("tasks_done", []) # List of strings
-                    session_task_count = entry.get("task_count", 0) # Number
-                    
-                    # Parse minutes
                     try: minutes = int(str(duration_str).split()[0])
                     except: minutes = 0
                     
-                    # Initialize user if new
                     if name not in user_stats:
-                        user_stats[name] = {'minutes': 0, 'tasks': 0, 'history': []}
+                        user_stats[name] = {'minutes': 0, 'tasks': 0, 'history': {}} # Initialize as Dict
                     
-                    # Add totals
                     user_stats[name]['minutes'] += minutes
                     user_stats[name]['tasks'] += session_task_count
                     
-                    # Add specific unique tasks to history
+                    # 🟢 NEW LOGIC: Count occurrences
                     for t in session_tasks:
-                        if t not in user_stats[name]['history']:
-                            user_stats[name]['history'].append(t)
+                        current_count = user_stats[name]['history'].get(t, 0)
+                        user_stats[name]['history'][t] = current_count + 1
 
-                # --- 3. SORT (By Minutes) ---
+                # SORT
                 sorted_users = sorted(user_stats.items(), key=lambda item: item[1]['minutes'], reverse=True)
 
-                # --- 4. DISPLAY ---
+                # DISPLAY
                 rank = 1
                 for name, stats in sorted_users:
                     total_mins = stats['minutes']
                     total_tasks = stats['tasks']
-                    history = stats['history']
+                    history = stats['history'] # This is now {'TaskA': 1, 'TaskB': 2}
                     
-                    # Format Time
                     hours, mins = divmod(total_mins, 60)
                     time_str = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
                     
-                    # Rank Colors
                     card_color = ("gray85", "gray20")
                     text_color = "white"
                     if rank == 1: text_color = "#FFD700" 
                     elif rank == 2: text_color = "#C0C0C0" 
                     elif rank == 3: text_color = "#CD7F32" 
 
-                    # Pass ALL data to the row creator
                     self.after(0, lambda n=name, t=time_str, tc=total_tasks, h=history, r=rank, c=card_color, txt=text_color: 
                                self.create_leaderboard_row(n, t, tc, h, r, c, txt))
                     rank += 1
@@ -308,36 +299,32 @@ class ModernTimer(ctk.CTk):
         l4.bind("<Button-1>", on_click)
 
     def show_user_details(self, name, time_str, task_count, history):
-        # Create a new top-level window (Popup)
+        # Create a new top-level window
         detail_window = ctk.CTkToplevel(self)
         detail_window.title(f"{name}'s Profile")
         detail_window.geometry("300x400")
-        
-        # Force it to the front
         detail_window.attributes('-topmost', True)
         detail_window.lift()
 
-        # --- HEADER ---
+        # Header
         ctk.CTkLabel(detail_window, text=name, font=("Roboto Medium", 24)).pack(pady=(20, 5))
         ctk.CTkLabel(detail_window, text="Focus Stats", text_color="gray").pack(pady=(0, 20))
 
-        # --- STATS GRID ---
+        # Stats Grid
         stats_frame = ctk.CTkFrame(detail_window, fg_color="transparent")
         stats_frame.pack(fill="x", padx=20)
         
-        # Time Column
         f1 = ctk.CTkFrame(stats_frame, fg_color=("gray90", "gray20"))
         f1.pack(side="left", fill="x", expand=True, padx=5)
         ctk.CTkLabel(f1, text="Time", font=("Arial", 12)).pack(pady=(5,0))
         ctk.CTkLabel(f1, text=time_str, font=("Arial", 16, "bold"), text_color="#00C853").pack(pady=(0,5))
 
-        # Tasks Column
         f2 = ctk.CTkFrame(stats_frame, fg_color=("gray90", "gray20"))
         f2.pack(side="left", fill="x", expand=True, padx=5)
         ctk.CTkLabel(f2, text="Tasks Done", font=("Arial", 12)).pack(pady=(5,0))
         ctk.CTkLabel(f2, text=str(task_count), font=("Arial", 16, "bold"), text_color="#1E88E5").pack(pady=(0,5))
 
-        # --- TASK HISTORY LIST ---
+        # List
         ctk.CTkLabel(detail_window, text="Completed Tasks", font=("Roboto Medium", 14)).pack(pady=(30, 10))
         
         scroll = ctk.CTkScrollableFrame(detail_window, width=250, height=150)
@@ -346,11 +333,17 @@ class ModernTimer(ctk.CTk):
         if not history:
             ctk.CTkLabel(scroll, text="No tasks recorded.", text_color="gray").pack(pady=20)
         else:
-            for task_name in history:
-                # Simple row for each task
+            # 🟢 NEW LOGIC: Iterate through dictionary items
+            for task_name, count in history.items():
                 row = ctk.CTkFrame(scroll, fg_color="transparent")
                 row.pack(fill="x", pady=2)
-                ctk.CTkLabel(row, text="✅ " + task_name, anchor="w", font=("Roboto", 12)).pack(fill="x", padx=5)
+                
+                # Format text: "Homework" OR "Homework x3"
+                display_text = f"✅ {task_name}"
+                if count > 1:
+                    display_text += f" (x{count})"
+                    
+                ctk.CTkLabel(row, text=display_text, anchor="w", font=("Roboto", 12)).pack(fill="x", padx=5)
 
     # --- PAGE C: TASKS UI SETUP ---
     def setup_tasks_ui(self, parent_frame):
@@ -441,13 +434,12 @@ class ModernTimer(ctk.CTk):
         del_btn.pack(side="right")
 
     def mark_task_complete(self, row_widget, task_text):
-        """Marks task as done in file, then removes from UI"""
-        # 1. Update the Data File
+        """Marks task as done in file, removes from UI, and UPLOADS to web"""
+        # 1. Update the Data File (Local Storage)
         all_data = self.load_all_data()
         date_key = self.get_date_key()
         day_tasks = all_data.get(date_key, [])
 
-        # Find the task and set done=True
         found = False
         for t in day_tasks:
             if t["text"] == task_text:
@@ -455,7 +447,6 @@ class ModernTimer(ctk.CTk):
                 found = True
                 break
         
-        # If for some reason it wasn't in the file, add it
         if not found:
             day_tasks.append({"text": task_text, "done": True})
 
@@ -464,8 +455,11 @@ class ModernTimer(ctk.CTk):
         with open("user_tasks.json", "w") as f:
             json.dump(all_data, f, indent=4)
 
-        # 2. Remove from Screen
+        # 2. Remove from Screen (UI)
         row_widget.destroy()
+
+        # 3. 🟢 UPLOAD TO CLOUD IMMEDIATELY
+        threading.Thread(target=self.upload_single_task_to_web, args=(task_text,)).start()
 
     def delete_task(self, row_widget):
         row_widget.destroy()
@@ -531,6 +525,21 @@ class ModernTimer(ctk.CTk):
 
 
     # --- TASK PERSISTENCE (Save/Load) ---
+    def upload_single_task_to_web(self, task_name):
+        """Sends just ONE task to the cloud immediately"""
+        data = {
+            "username": self.username,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "duration": "0 min",     # No time added
+            "tasks_done": [task_name],
+            "task_count": 1          # Count increases by 1
+        }
+        try: 
+            requests.post(FIREBASE_URL, json=data)
+            print(f"DEBUG: Uploaded task '{task_name}'")
+        except Exception as e:
+            print(f"Upload failed: {e}")
+
     def get_all_tasks(self):
         """Scrapes the UI to find all current tasks"""
         tasks = []
@@ -636,23 +645,16 @@ class ModernTimer(ctk.CTk):
         self.cancel_btn.configure(text="BACK")
 
     def save_session_to_web(self):
-        # 1. Get Completed Tasks for TODAY
-        completed_tasks = []
-        try:
-            # We reuse the logic we wrote for the calendar to find today's key
-            today_key = datetime.now().strftime("%Y-%m-%d")
-            
-            if os.path.exists("user_tasks.json"):
-                with open("user_tasks.json", "r") as f:
-                    all_data = json.load(f)
-                    # Handle the list vs dict migration check just in case
-                    if isinstance(all_data, list): all_data = {today_key: all_data}
-                    
-                    todays_list = all_data.get(today_key, [])
-                    # Filter for tasks that are done
-                    completed_tasks = [t["text"] for t in todays_list if t["done"]]
-        except Exception as e:
-            print(f"Error reading tasks: {e}")
+        """Uploads ONLY the time duration (Tasks are handled separately now)"""
+        data = {
+            "username": self.username,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "duration": f"{self.initial_time} min",
+            "tasks_done": [],  # Empty, because tasks are uploaded individually now
+            "task_count": 0
+        }
+        try: requests.post(FIREBASE_URL, json=data)
+        except: pass
 
         # 2. Prepare Payload
         data = {
