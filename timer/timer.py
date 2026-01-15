@@ -606,7 +606,7 @@ class ModernTimer(ctk.CTk):
         if self.input_string == "": return
         self.timer_state = "RUNNING"
         self.initial_time = int(self.input_string)
-        self.time_left = self.initial_time * 1
+        self.time_left = self.initial_time * 60
         self.hint_label.pack_forget()
         self.timer_label.configure(text_color="white")
         self.main_action_btn.configure(text="PAUSE", fg_color="#FF9800", hover_color="#F57C00")
