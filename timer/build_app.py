@@ -8,6 +8,39 @@ import venv
 # Name of the internal sandbox folder
 VENV_NAME = "build_env"
 
+def check_linux_system_deps():
+    """Checks for system-level dependencies on Linux (specifically Tkinter)"""
+    if platform.system() != "Linux":
+        return
+
+    print("🐧 Linux detected. Checking system components...")
+    
+    # 1. Check if Tkinter is installed via Python
+    try:
+        import tkinter
+        print("✅ Tkinter is already installed.")
+    except ImportError:
+        print("⚠️  Tkinter (GUI helper) is missing!")
+        
+        # 2. Check if we can use apt-get (Debian/Ubuntu/Mint)
+        if shutil.which("apt-get"):
+            print("📦 Attempting to install 'python3-tk' via apt-get...")
+            print("🔑 You may be asked for your password (sudo).")
+            try:
+                # Run the system command
+                subprocess.check_call(['sudo', 'apt-get', 'update'])
+                subprocess.check_call(['sudo', 'apt-get', 'install', '-y', 'python3-tk'])
+                print("✅ System dependencies installed!")
+            except subprocess.CalledProcessError:
+                print("❌ Automatic install failed.")
+                print("👉 Please run this manually: sudo apt-get install python3-tk")
+                sys.exit(1)
+        else:
+            # Non-Debian systems (Fedora, Arch, etc.)
+            print("❌ Automatic install not supported for this Linux distro.")
+            print("👉 Please install 'python3-tk' or 'tk' using your package manager (dnf, pacman, etc).")
+            sys.exit(1)
+
 def get_venv_python():
     """Returns the path to the Python executable inside the virtual environment"""
     if platform.system() == "Windows":
@@ -32,17 +65,16 @@ def setup_virtual_env():
 
 def install_dependencies():
     """Installs required libraries into the VIRTUAL environment"""
-    required = ['customtkinter', 'requests', 'plyer', 'pyinstaller']
+    # Added 'packaging' as it's sometimes needed by pyinstaller on Linux
+    required = ['customtkinter', 'requests', 'plyer', 'pyinstaller', 'packaging']
     pip_exe = get_venv_pip()
     
-    print("🔍 Checking and installing dependencies inside sandbox...")
-    # We use the venv's pip to install safely
+    print("🔍 Checking and installing Python libraries...")
     subprocess.check_call([pip_exe, "install"] + required)
 
 def build_executable():
     """Runs PyInstaller using the VIRTUAL environment's Python"""
     os_name = platform.system()
-    print(f"💻 Detected System: {os_name}")
     
     # Smart Path Detection
     if os.path.exists("timer.py"):
@@ -56,7 +88,6 @@ def build_executable():
     icon_path = "icon.ico"
     app_name = "FocusTimer"
     
-    # We run PyInstaller using the SANDBOX Python, not the System Python
     venv_python = get_venv_python()
     
     # Base command
@@ -73,35 +104,36 @@ def build_executable():
         if os_name == "Windows":
             cmd.append(f"--icon={icon_path}")
             cmd.append(f"--add-data={icon_path};.") 
-        elif os_name == "Darwin": # Mac
-            # Mac doesn't strictly use .ico for the app icon (needs .icns), 
-            # but we include it for internal use
-            cmd.append(f"--add-data={icon_path}:.")
         elif os_name == "Linux":
+            # Linux doesn't support .ico icons on the executable itself in the same way,
+            # but we include it for the window icon.
             cmd.append(f"--add-data={icon_path}:.")
     
     cmd.append(script_path)
 
-    print("🚀 Starting Build Process... (This may take a minute)")
+    print("🚀 Starting Build Process...")
     try:
         subprocess.check_call(cmd)
         print("\n" + "="*30)
         print("✅ BUILD COMPLETE!")
-        print(f"Go to the 'dist' folder to find your {app_name} app.")
+        print(f"Go to the 'dist' folder to find your {app_name} file.")
         print("="*30)
     except subprocess.CalledProcessError as e:
         print(f"\n❌ Build Failed: {e}")
 
 if __name__ == "__main__":
     try:
-        # 1. Create the sandbox
+        # 1. Check Linux System Deps (The new part!)
+        check_linux_system_deps()
+        
+        # 2. Create the sandbox
         setup_virtual_env()
-        # 2. Install libraries INTO the sandbox
+        
+        # 3. Install libraries INTO the sandbox
         install_dependencies()
-        # 3. Build using the sandbox tools
+        
+        # 4. Build using the sandbox tools
         build_executable()
         
     except Exception as e:
         print(f"❌ Error: {e}")
-    
-    input("Press Enter to exit...")
