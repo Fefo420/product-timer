@@ -76,44 +76,81 @@ class ModernTimer(ctk.CTk):
             self.login_frame.destroy()
             self.setup_main_layout()
 
-    # --- MAIN LAYOUT (Sidebar + Content) ---
+        # --- MAIN LAYOUT (Sidebar + Content) ---
     def setup_main_layout(self):
-        # 1. Create Sidebar (Left)
-        self.sidebar = ctk.CTkFrame(self, width=140, corner_radius=0)
-        self.sidebar.pack(side="left", fill="y") # Fill vertical height
+        # 1. Create Sidebar (Left) - Made it narrow (70px)
+        self.sidebar = ctk.CTkFrame(self, width=70, corner_radius=0)
+        self.sidebar.pack(side="left", fill="y") 
+        
+        # Prevent the sidebar from shrinking if empty
+        self.sidebar.pack_propagate(False)
 
-        # Sidebar Title
-        ctk.CTkLabel(self.sidebar, text=f"Hi, {self.username}", font=("Roboto Medium", 16)).pack(pady=(30, 20))
+        # Space at the top
+        ctk.CTkFrame(self.sidebar, height=30, fg_color="transparent").pack()
 
-        # Nav Buttons
-        self.btn_timer = ctk.CTkButton(self.sidebar, text="⏱ Timer", command=self.show_timer_page, fg_color="transparent", border_width=1, text_color=("gray10", "gray90"))
+        # --- NAV BUTTONS (Icons) ---
+        # We use a large font size for the emoji to make it look like a vector icon
+        
+        self.btn_timer = ctk.CTkButton(
+            self.sidebar, 
+            text="⏱",                 # Stopwatch Icon
+            font=("Arial", 30),        # Large font makes it an icon
+            command=self.show_timer_page, 
+            width=50, height=50,       # Perfect Square
+            corner_radius=10,
+            fg_color="transparent", 
+            text_color=("gray10", "gray90"),
+            hover_color=("gray70", "gray30")
+        )
         self.btn_timer.pack(pady=10, padx=10)
 
-        self.btn_leaderboard = ctk.CTkButton(self.sidebar, text="🏆 Leaderboard", command=self.show_leaderboard_page, fg_color="transparent", border_width=1, text_color=("gray10", "gray90"))
+        self.btn_leaderboard = ctk.CTkButton(
+            self.sidebar, 
+            text="🏆",                 # Trophy Icon
+            font=("Arial", 30),
+            command=self.show_leaderboard_page, 
+            width=50, height=50,       # Perfect Square
+            corner_radius=10,
+            fg_color="transparent", 
+            text_color=("gray10", "gray90"),
+            hover_color=("gray70", "gray30")
+        )
         self.btn_leaderboard.pack(pady=10, padx=10)
 
         # 2. Create Content Area (Right)
         self.content_area = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.content_area.pack(side="right", fill="both", expand=True)
+        
+        # Move the "Hi User" greeting here (Top Right of content)
+        self.greeting_label = ctk.CTkLabel(
+            self.content_area, 
+            text=f"Hi, {self.username}", 
+            font=("Roboto Medium", 14), 
+            text_color="gray"
+        )
+        self.greeting_label.pack(anchor="ne", padx=20, pady=10) # 'ne' = North East (Top Right)
 
         # 3. Create the Two "Pages" (Frames) inside Content Area
-        # We create them both now, but only show one at a time.
         
         # -- Page A: Timer --
         self.timer_page_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
-        self.setup_timer_ui(self.timer_page_frame) # Build the timer UI inside this frame
+        self.setup_timer_ui(self.timer_page_frame) 
 
         # -- Page B: Leaderboard --
         self.leaderboard_page_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
-        self.setup_leaderboard_ui(self.leaderboard_page_frame) # Build leaderboard UI
+        self.setup_leaderboard_ui(self.leaderboard_page_frame) 
 
         # Start by showing the Timer
         self.show_timer_page()
-
-    # --- NAVIGATION LOGIC ---
+    
+        # --- NAVIGATION LOGIC ---
     def show_timer_page(self):
-        self.leaderboard_page_frame.pack_forget() # Hide Leaderboard
-        self.timer_page_frame.pack(fill="both", expand=True) # Show Timer
+        self.leaderboard_page_frame.pack_forget() 
+        self.timer_page_frame.pack(fill="both", expand=True) 
+        
+        # Highlight: Darker background to show it's active
+        self.btn_timer.configure(fg_color=("gray75", "gray25"))
+        self.btn_leaderboard.configure(fg_color="transparent")
         
         # Highlight the active button
         self.btn_timer.configure(fg_color=("gray75", "gray25"))
