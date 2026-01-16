@@ -79,7 +79,7 @@ class FocusApp(ctk.CTk):
         self.pages = {}
         
         # We pass 'self' as the controller
-        self.pages["Timer"] = TimerPage(self.container, self)
+        self.pages["Timer"] = TimerPage(self.container, self, self.task_manager)
         self.pages["Leaderboard"] = LeaderboardPage(self.container, self)
         self.pages["Tasks"] = TasksPage(self.container, self, self.task_manager)
         self.pages["Wheel"] = WheelPage(self.container, self, self.task_manager)
@@ -110,7 +110,7 @@ class FocusApp(ctk.CTk):
         if hasattr(page, "refresh"): page.refresh()
         elif hasattr(page, "refresh_data"): page.refresh_data()
         
-        self.focus() # Reset focus so keys work
+        self.focus()
 
 if __name__ == "__main__":
     app = FocusApp()
