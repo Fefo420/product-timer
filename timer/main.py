@@ -1,10 +1,22 @@
-import customtkinter as ctk
+import sys
 import os
+
+# Fix console crash
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+
+# Fix missing modules
+import unicodedata
+import idna
+
+import customtkinter as ctk
 import json
 import config
 from view_tasks import TaskManager
 from view_ui import MainUI
-from updater import AppUpdater #
+from updater import AppUpdater
 
 # --- CONFIG ---
 ctk.set_appearance_mode("Dark")
@@ -14,7 +26,7 @@ class FocusApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title(f"Focus Station v{config.CURRENT_VERSION}") # Show version in title
+        self.title(f"Focus Station v{config.CURRENT_VERSION}") 
         self.geometry("1100x700")
         try: self.iconbitmap("icon.ico")
         except: pass
@@ -51,8 +63,6 @@ class FocusApp(ctk.CTk):
         """Called by updater thread when check finishes"""
         if found:
             self.new_version_str = version_str
-            # Show a notification or button on the UI
-            # We will hijack the login or main UI to show a banner
             self.after(0, self.show_update_banner)
 
     def show_update_banner(self):
@@ -109,7 +119,6 @@ class FocusApp(ctk.CTk):
     def launch_main_ui(self):
         self.ui = MainUI(self, self, self.username, self.task_manager)
         self.ui.pack(fill="both", expand=True)
-        # Ensure update banner stays on top if it exists
         if hasattr(self, 'update_frame'): self.update_frame.lift()
 
 if __name__ == "__main__":

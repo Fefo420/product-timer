@@ -20,10 +20,13 @@ class AppUpdater:
 
     def _worker_check(self):
         try:
-            # 1. Fetch remote version string
             print(f"Checking updates at: {config.VERSION_URL}")
             r = requests.get(config.VERSION_URL, timeout=5)
-            if r.status_code != 200: return
+            
+            # 🟢 CHANGE THIS PART:
+            if r.status_code != 200:
+                print(f"❌ Error! Server returned code: {r.status_code}") # Print the error!
+                return
 
             remote_ver_str = r.text.strip()
             remote_ver = version.parse(remote_ver_str)
@@ -107,8 +110,16 @@ class AppUpdater:
 
             # 4. Relaunch
             print("Relaunching...")
-            subprocess.Popen([current_exe])
-            sys.exit(0) # Kill this process
+            
+            # Use this to hide the black console window on restart
+            if self.os_type == "Windows":
+                subprocess.Popen([current_exe], creationflags=0x08000000)
+            else:
+                subprocess.Popen([current_exe])
+                
+            # 🔴 THE FIX: Use os._exit(0) instead of sys.exit(0)
+            # sys.exit() only kills the thread. os._exit(0) kills the whole app.
+            os._exit(0) 
 
         except Exception as e:
             print(f"Swap Failed: {e}")
