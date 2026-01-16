@@ -6,6 +6,19 @@ ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("green")
 
 # Constants
+# 🟢 UPDATE THESE THREE LINES FOR YOUR REPO:
+GITHUB_USER = "Fefo420"   # Your GitHub Username
+GITHUB_REPO = "product-timer"  # Your Repository Name
+CURRENT_VERSION = "1.0.0"      # Update this number manually before every build!
+
+# URLs (Don't change these, they are automatic)
+# Checks this raw file for the version number "1.0.1" etc.
+VERSION_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/version.txt"
+
+# Where to find the executable downloads
+RELEASE_URL = f"https://github.com/{GITHUB_USER}/{GITHUB_REPO}/releases/latest/download/"
+
+# Database
 FIREBASE_URL = "https://productivity-71d06-default-rtdb.europe-west1.firebasedatabase.app/leaderboard.json"
 CONFIG_FILE = "user_config.json"
 TASKS_FILE = "user_tasks.json"
