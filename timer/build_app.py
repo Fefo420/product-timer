@@ -8,38 +8,28 @@ import venv
 # Name of the internal sandbox folder
 VENV_NAME = "build_env"
 
-def check_linux_system_deps():
-    """Checks for system-level dependencies on Linux (specifically Tkinter)"""
-    if platform.system() != "Linux":
-        return
-
-    print("🐧 Linux detected. Checking system components...")
-    
-    # 1. Check if Tkinter is installed via Python
-    try:
-        import tkinter
-        print("✅ Tkinter is already installed.")
-    except ImportError:
-        print("⚠️  Tkinter (GUI helper) is missing!")
-        
-        # 2. Check if we can use apt-get (Debian/Ubuntu/Mint)
-        if shutil.which("apt-get"):
-            print("📦 Attempting to install 'python3-tk' via apt-get...")
-            print("🔑 You may be asked for your password (sudo).")
-            try:
-                # Run the system command
-                subprocess.check_call(['sudo', 'apt-get', 'update'])
-                subprocess.check_call(['sudo', 'apt-get', 'install', '-y', 'python3-tk'])
-                print("✅ System dependencies installed!")
-            except subprocess.CalledProcessError:
-                print("❌ Automatic install failed.")
-                print("👉 Please run this manually: sudo apt-get install python3-tk")
+def check_system_deps():
+    """Checks for system-level dependencies (Linux specific)"""
+    if platform.system() == "Linux":
+        print("🐧 Linux detected. Checking system components...")
+        try:
+            import tkinter
+            print("✅ Tkinter is already installed.")
+        except ImportError:
+            print("⚠️  Tkinter (GUI helper) is missing!")
+            if shutil.which("apt-get"):
+                print("📦 Attempting to install 'python3-tk' via apt-get...")
+                print("🔑 You may be asked for your password (sudo).")
+                try:
+                    subprocess.check_call(['sudo', 'apt-get', 'update'])
+                    subprocess.check_call(['sudo', 'apt-get', 'install', '-y', 'python3-tk'])
+                    print("✅ System dependencies installed!")
+                except subprocess.CalledProcessError:
+                    print("❌ Automatic install failed. Run: sudo apt-get install python3-tk")
+                    sys.exit(1)
+            else:
+                print("❌ Please install 'python3-tk' using your package manager (dnf, pacman, etc).")
                 sys.exit(1)
-        else:
-            # Non-Debian systems (Fedora, Arch, etc.)
-            print("❌ Automatic install not supported for this Linux distro.")
-            print("👉 Please install 'python3-tk' or 'tk' using your package manager (dnf, pacman, etc).")
-            sys.exit(1)
 
 def get_venv_python():
     """Returns the path to the Python executable inside the virtual environment"""
@@ -65,8 +55,7 @@ def setup_virtual_env():
 
 def install_dependencies():
     """Installs required libraries into the VIRTUAL environment"""
-    # Added 'packaging' as it's sometimes needed by pyinstaller on Linux
-    required = ['customtkinter', 'requests', 'plyer', 'pyinstaller', 'packaging']
+    required = ['customtkinter', 'requests', 'plyer', 'pyinstaller', 'packaging', 'pillow']
     pip_exe = get_venv_pip()
     
     print("🔍 Checking and installing Python libraries...")
@@ -75,8 +64,8 @@ def install_dependencies():
 def build_executable():
     """Runs PyInstaller using the VIRTUAL environment's Python"""
     os_name = platform.system()
+    print(f"💻 Detected System: {os_name}")
     
-    # Smart Path Detection
     if os.path.exists("timer.py"):
         script_path = "timer.py"
     elif os.path.exists(os.path.join("timer", "timer.py")):
@@ -99,16 +88,18 @@ def build_executable():
         "--collect-all", "customtkinter",
     ]
 
-    # OS Specific Settings
+    # Universal Icon Handling
     if os.path.exists(icon_path):
+        # Windows uses ';' separator. Mac and Linux use ':'
+        separator = ";" if os_name == "Windows" else ":"
+        
+        # Add the icon file to the internal bundle
+        cmd.append(f"--add-data={icon_path}{separator}.")
+        
+        # On Windows, we can also set the .exe file icon directly
         if os_name == "Windows":
             cmd.append(f"--icon={icon_path}")
-            cmd.append(f"--add-data={icon_path};.") 
-        elif os_name == "Linux":
-            # Linux doesn't support .ico icons on the executable itself in the same way,
-            # but we include it for the window icon.
-            cmd.append(f"--add-data={icon_path}:.")
-    
+
     cmd.append(script_path)
 
     print("🚀 Starting Build Process...")
@@ -123,17 +114,13 @@ def build_executable():
 
 if __name__ == "__main__":
     try:
-        # 1. Check Linux System Deps (The new part!)
-        check_linux_system_deps()
-        
-        # 2. Create the sandbox
+        check_system_deps()
         setup_virtual_env()
-        
-        # 3. Install libraries INTO the sandbox
         install_dependencies()
-        
-        # 4. Build using the sandbox tools
         build_executable()
         
     except Exception as e:
         print(f"❌ Error: {e}")
+    
+    if platform.system() == "Windows":
+        input("Press Enter to exit...")
