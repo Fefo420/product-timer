@@ -66,8 +66,8 @@ def build_executable():
     os_name = platform.system()
     print(f"💻 Detected System: {os_name}")
     
-    if os.path.exists("timer.py"):
-        script_path = "timer.py"
+    if os.path.exists("main.py"):
+        script_path = "main.py"
     elif os.path.exists(os.path.join("timer", "timer.py")):
         script_path = os.path.join("timer", "timer.py")
     else:
