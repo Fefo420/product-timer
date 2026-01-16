@@ -3,6 +3,8 @@ import requests
 import json
 import threading
 import os
+import math
+import random
 from datetime import datetime
 from plyer import notification
 from datetime import datetime, timedelta
@@ -79,14 +81,14 @@ class ModernTimer(ctk.CTk):
 
         # --- MAIN LAYOUT (Sidebar + Content) ---
     def setup_main_layout(self):
-        # 1. Create Sidebar
+        # 1. Sidebar
         self.sidebar = ctk.CTkFrame(self, width=70, corner_radius=0)
         self.sidebar.pack(side="left", fill="y") 
         self.sidebar.pack_propagate(False)
 
         ctk.CTkFrame(self.sidebar, height=30, fg_color="transparent").pack()
 
-        # --- NAV BUTTONS ---
+        # Nav Buttons
         self.btn_timer = ctk.CTkButton(self.sidebar, text="⏱", font=("Arial", 30), command=self.show_timer_page, width=50, height=50, corner_radius=10, fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"))
         self.btn_timer.pack(pady=10, padx=10)
 
@@ -95,6 +97,10 @@ class ModernTimer(ctk.CTk):
 
         self.btn_tasks = ctk.CTkButton(self.sidebar, text="📅", font=("Arial", 30), command=self.show_tasks_page, width=50, height=50, corner_radius=10, fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"))
         self.btn_tasks.pack(pady=10, padx=10)
+        
+        # 🟢 NEW: Wheel Button
+        self.btn_wheel = ctk.CTkButton(self.sidebar, text="🎡", font=("Arial", 30), command=self.show_wheel_page, width=50, height=50, corner_radius=10, fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"))
+        self.btn_wheel.pack(pady=10, padx=10)
 
         # 2. Content Area
         self.content_area = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
@@ -103,21 +109,20 @@ class ModernTimer(ctk.CTk):
         self.greeting_label = ctk.CTkLabel(self.content_area, text=f"Hi, {self.username}", font=("Roboto Medium", 14), text_color="gray")
         self.greeting_label.pack(anchor="ne", padx=20, pady=10)
 
-        # 3. Create ALL Pages (Frames)
-        
-        # -- Page A: Timer --
+        # 3. Create ALL Pages
         self.timer_page_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
         self.setup_timer_ui(self.timer_page_frame) 
 
-        # -- Page B: Leaderboard --
         self.leaderboard_page_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
         self.setup_leaderboard_ui(self.leaderboard_page_frame) 
 
-        # -- Page C: Tasks (THIS WAS MISSING) --
         self.tasks_page_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
         self.setup_tasks_ui(self.tasks_page_frame)
 
-        # Now it is safe to show the first page
+        # 🟢 NEW: Wheel Page Frame
+        self.wheel_page_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        self.setup_wheel_ui(self.wheel_page_frame)
+
         self.show_timer_page()
     
 
@@ -150,6 +155,31 @@ class ModernTimer(ctk.CTk):
         self.btn_leaderboard.configure(fg_color="transparent")
         self.btn_tasks.configure(fg_color="transparent")
 
+    def show_wheel_page(self):
+        self._hide_all_pages()
+        self.wheel_page_frame.pack(fill="both", expand=True)
+        self.btn_wheel.configure(fg_color=("gray75", "gray25"))
+        self.refresh_wheel_data() # Load fresh tasks
+
+    # Update show_tasks_page to refresh list when clicked
+    def show_tasks_page(self):
+        self._hide_all_pages()
+        self.tasks_page_frame.pack(fill="both", expand=True)
+        self.btn_tasks.configure(fg_color=("gray75", "gray25"))
+        self.refresh_task_list() # Ensure we see updates from wheel
+
+    def _hide_all_pages(self):
+        self.timer_page_frame.pack_forget()
+        self.leaderboard_page_frame.pack_forget()
+        self.tasks_page_frame.pack_forget()
+        self.wheel_page_frame.pack_forget() # Hide wheel too
+        
+        self.task_entry.delete(0, "end")
+        
+        self.btn_timer.configure(fg_color="transparent")
+        self.btn_leaderboard.configure(fg_color="transparent")
+        self.btn_tasks.configure(fg_color="transparent")
+        self.btn_wheel.configure(fg_color="transparent")
 
     # --- PAGE A: TIMER UI SETUP ---
     def setup_timer_ui(self, parent_frame):
@@ -380,6 +410,194 @@ class ModernTimer(ctk.CTk):
         # Load initial data
         self.refresh_task_list()
 
+
+    # --- PAGE D: SPINNING WHEEL UI ---
+    def setup_wheel_ui(self, parent_frame):
+        ctk.CTkLabel(parent_frame, text="Task Roulette", font=("Roboto Medium", 20)).pack(pady=10)
+        
+        # 🟢 CHANGE: Remove fixed width/height so it fills the space
+        self.wheel_canvas = ctk.CTkCanvas(parent_frame, bg="#2b2b2b", highlightthickness=0)
+        self.wheel_canvas.pack(pady=10, fill="both", expand=True)
+        
+        # 🟢 NEW: Watch for resize events
+        self.wheel_canvas.bind("<Configure>", lambda e: self.draw_wheel())
+        
+        self.spin_btn = ctk.CTkButton(parent_frame, text="SPIN!", command=self.start_spin, width=150, height=40, font=("Roboto Medium", 16), fg_color="#E91E63", hover_color="#C2185B")
+        self.spin_btn.pack(pady=10)
+
+        self.result_label = ctk.CTkLabel(parent_frame, text="", font=("Roboto Medium", 18), text_color="#00E676")
+        self.result_label.pack(pady=5)
+        
+        self.wheel_done_btn = ctk.CTkButton(parent_frame, text="Mark as Done & Remove", command=self.complete_wheel_task, fg_color="#00C853", hover_color="#009624")
+        
+        self.wheel_tasks = []
+        self.wheel_colors = ["#EF5350", "#AB47BC", "#5C6BC0", "#29B6F6", "#26A69A", "#9CCC65", "#FFA726", "#FF7043"]
+        self.current_angle = 0
+        self.is_spinning = False
+        self.selected_task = None
+
+    def refresh_wheel_data(self):
+        """Loads incomplete tasks for TODAY, but remembers the winner if one exists"""
+        all_data = self.load_all_data()
+        date_key = self.get_date_key()
+        todays_list = all_data.get(date_key, [])
+        
+        # 1. Get current list of undone tasks
+        current_tasks = [t["text"] for t in todays_list if not t["done"]]
+        self.wheel_tasks = current_tasks
+        
+        # 2. Check if we have a "Selected Task" pending
+        if self.selected_task:
+            # Verify the selected task is still in the list (in case you deleted it in the Task tab)
+            if self.selected_task in self.wheel_tasks:
+                # Restoring the "Winner" view
+                self.result_label.configure(text=f"Selected: {self.selected_task}")
+                self.wheel_done_btn.pack(pady=10)
+            else:
+                # The task was deleted elsewhere, so reset the view
+                self.selected_task = None
+                self.result_label.configure(text="")
+                self.wheel_done_btn.pack_forget()
+        else:
+            # No active selection, clean slate
+            self.result_label.configure(text="")
+            self.wheel_done_btn.pack_forget()
+
+        self.draw_wheel()
+
+    def draw_wheel(self):
+        self.wheel_canvas.delete("all")
+        
+        # 🟢 NEW: Get actual size dynamically
+        w = self.wheel_canvas.winfo_width()
+        h = self.wheel_canvas.winfo_height()
+        
+        # Prevent drawing if window is too small (startup glitch prevention)
+        if w < 50 or h < 50: return
+
+        cx, cy = w / 2, h / 2
+        # Radius is half the smallest side, minus padding
+        r = (min(w, h) / 2) - 20 
+        
+        if not self.wheel_tasks:
+            # Empty State
+            self.wheel_canvas.create_oval(cx-r, cy-r, cx+r, cy+r, outline="gray", width=2)
+            self.wheel_canvas.create_text(cx, cy, text="No tasks left!", fill="white", font=("Arial", 14))
+            self.spin_btn.configure(state="disabled")
+            return
+
+        self.spin_btn.configure(state="normal")
+        num_tasks = len(self.wheel_tasks)
+        
+        # 🟢 FIX: Single Task Case (Draw Circle instead of Arc)
+        if num_tasks == 1:
+            self.wheel_canvas.create_oval(
+                cx-r, cy-r, cx+r, cy+r,
+                fill=self.wheel_colors[0], outline="#2b2b2b"
+            )
+            self.wheel_canvas.create_text(cx, cy, text=self.wheel_tasks[0], fill="white", font=("Arial", 14, "bold"))
+            
+            # Draw Pointer (Fixed at right side)
+            self.wheel_canvas.create_polygon(cx+r+10, cy-10, cx+r+10, cy+10, cx+r-20, cy, fill="white")
+            return
+
+        # Multiple Tasks Case
+        arc_size = 360 / num_tasks
+        
+        for i, task in enumerate(self.wheel_tasks):
+            start_angle = self.current_angle + (i * arc_size)
+            color = self.wheel_colors[i % len(self.wheel_colors)]
+            
+            self.wheel_canvas.create_arc(
+                cx-r, cy-r, cx+r, cy+r,
+                start=start_angle, extent=arc_size,
+                fill=color, outline="#2b2b2b"
+            )
+            
+            # Dynamic Text Position
+            mid_angle_rad = math.radians(start_angle + arc_size/2)
+            tx = cx + (r * 0.6) * math.cos(mid_angle_rad)
+            ty = cy - (r * 0.6) * math.sin(mid_angle_rad) 
+            
+            display_text = task[:10] + "..." if len(task) > 10 else task
+            # Scale font slightly based on radius
+            font_size = max(8, int(r / 10))
+            self.wheel_canvas.create_text(tx, ty, text=display_text, fill="white", font=("Arial", font_size, "bold"))
+
+        # Draw Pointer (Dynamic Position)
+        # Calculates the right edge of the circle: cx + r
+        px = cx + r
+        self.wheel_canvas.create_polygon(px+20, cy-10, px+20, cy+10, px-10, cy, fill="white")
+
+    def start_spin(self):
+        if self.is_spinning or not self.wheel_tasks: return
+        
+        # 🟢 NEW: Clear the stored selection when starting a NEW spin
+        self.selected_task = None 
+        
+        self.is_spinning = True
+        self.result_label.configure(text="")
+        self.wheel_done_btn.pack_forget()
+        
+        self.spin_speed = 20
+        self.animate_spin()
+
+    def animate_spin(self):
+        if self.spin_speed > 0:
+            self.current_angle = (self.current_angle + self.spin_speed) % 360
+            self.draw_wheel()
+            
+            # Decelerate
+            self.spin_speed -= 0.2
+            
+            # Loop
+            self.after(20, self.animate_spin)
+        else:
+            self.is_spinning = False
+            self.determine_winner()
+
+    def determine_winner(self):
+        # In Tkinter, 0 degrees is 3 o'clock (Right). 
+        # Our pointer is at 0.
+        # We need to find which slice covers angle 360 (or 0)
+        
+        # Normalize angle to 0-360
+        normalized_angle = self.current_angle % 360
+        
+        # The slice "under" the pointer is calculated by logic:
+        # If wheel is at angle A, Slice 0 is at [A, A+size].
+        # We want to know which Slice N contains 360 (or 0).
+        
+        num_tasks = len(self.wheel_tasks)
+        arc_size = 360 / num_tasks
+        
+        # Math trick to find the index under the pointer
+        pointer_pos = 360 - normalized_angle
+        winner_index = int(pointer_pos // arc_size) % num_tasks
+        
+        self.selected_task = self.wheel_tasks[winner_index]
+        self.result_label.configure(text=f"Selected: {self.selected_task}")
+        self.wheel_done_btn.pack(pady=10)
+        
+        self.send_notification("Spin Complete", f"Your task is: {self.selected_task}")
+
+    def complete_wheel_task(self):
+        if self.selected_task:
+            # 1. Mark it done in the database
+            # Note: We pass None for the widget because the wheel has no checkbox to destroy
+            self.mark_task_complete(None, self.selected_task)
+            
+            # 2. 🟢 FIX: Explicitly forget the selection
+            # This tells the refresh function: "Don't show the winner button anymore"
+            self.selected_task = None
+            
+            # 3. Refresh the wheel to remove the slice
+            self.refresh_wheel_data()
+
+    def send_notification(self, title, msg):
+        try: notification.notify(title=title, message=msg, timeout=5)
+        except: pass
+
     # --- DATE LOGIC ---
     def get_date_key(self):
         """Returns string key for storage: '2023-10-27'"""
@@ -434,19 +652,20 @@ class ModernTimer(ctk.CTk):
         del_btn.pack(side="right")
 
     def mark_task_complete(self, row_widget, task_text):
-        """Marks task as done in file, removes from UI, and UPLOADS to web"""
-        # 1. Update the Data File (Local Storage)
+        """Marks task as done. row_widget can be None (if called from Wheel)."""
         all_data = self.load_all_data()
         date_key = self.get_date_key()
         day_tasks = all_data.get(date_key, [])
 
         found = False
         for t in day_tasks:
-            if t["text"] == task_text:
+            # Find the first task that matches the text and isn't done yet
+            if t["text"] == task_text and not t.get("done", False):
                 t["done"] = True
                 found = True
                 break
         
+        # Safety: If task somehow missing, add it as done
         if not found:
             day_tasks.append({"text": task_text, "done": True})
 
@@ -455,10 +674,11 @@ class ModernTimer(ctk.CTk):
         with open("user_tasks.json", "w") as f:
             json.dump(all_data, f, indent=4)
 
-        # 2. Remove from Screen (UI)
-        row_widget.destroy()
-
-        # 3. 🟢 UPLOAD TO CLOUD IMMEDIATELY
+        # Remove from UI (If it's a checkbox row)
+        if row_widget:
+            row_widget.destroy()
+            
+        # Upload to profile
         threading.Thread(target=self.upload_single_task_to_web, args=(task_text,)).start()
 
     def delete_task(self, row_widget):
