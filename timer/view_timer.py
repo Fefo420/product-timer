@@ -13,7 +13,7 @@ TEXT_SEC = "#94a3b8"
 
 class TimerPage(ctk.CTkFrame):
     def __init__(self, parent, controller, task_manager):
-        super().__init__(parent, fg_color="transparent") # Transparent to show UI background
+        super().__init__(parent, fg_color="transparent")
         self.controller = controller
         self.task_manager = task_manager
         
@@ -27,14 +27,13 @@ class TimerPage(ctk.CTkFrame):
         self.controller.bind("<Key>", self.handle_keypress)
 
     def setup_ui(self):
-        # HEADER
-        ctk.CTkLabel(self, text="FOCUS TIMER", font=("Roboto Medium", 14), text_color=TEXT_SEC).pack(pady=(40, 50))
+        # HEADER (Reduced padding)
+        ctk.CTkLabel(self, text="FOCUS TIMER", font=("Roboto Medium", 14), text_color=TEXT_SEC).pack(pady=(20, 10))
 
         # --- 1. IDLE STATE ---
         self.idle_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.idle_frame.pack(expand=True)
 
-        # A "Ghost" button style (Border only)
         self.new_session_btn = ctk.CTkButton(
             self.idle_frame, text="Start Session", command=self.enter_edit_mode,
             width=220, height=50, corner_radius=25,
@@ -43,54 +42,72 @@ class TimerPage(ctk.CTkFrame):
         )
         self.new_session_btn.pack()
 
-        # --- 2. ACTIVE STATE ---
+        # --- 2. ACTIVE STATE (Hidden initially) ---
         self.active_frame = ctk.CTkFrame(self, fg_color="transparent")
         
+        # Hint
         self.hint_label = ctk.CTkLabel(self.active_frame, text="Type minutes...", font=("Roboto", 16), text_color=TEXT_SEC)
-        self.hint_label.pack(pady=(0, 10))
+        self.hint_label.pack(pady=(0, 5))
 
-        # Ultra-Clean Font
-        self.timer_label = ctk.CTkLabel(self.active_frame, text="00:00", font=("Roboto", 120, "bold"), text_color="white")
-        self.timer_label.pack(pady=10)
+        # Timer Display (Font reduced to 90 for safety)
+        self.timer_label = ctk.CTkLabel(self.active_frame, text="00:00", font=("Roboto", 90, "bold"), text_color="white")
+        self.timer_label.pack(pady=5)
 
-        # Button Row
+        # Button Row (Reduced padding)
         self.btn_row = ctk.CTkFrame(self.active_frame, fg_color="transparent")
-        self.btn_row.pack(pady=40)
+        self.btn_row.pack(pady=20)
 
+        # 1. Start/Pause Button
         self.main_action_btn = ctk.CTkButton(
             self.btn_row, text="START", command=self.handle_main_button, 
-            width=140, height=50, corner_radius=25, 
+            width=140, height=45, corner_radius=22, 
             state="disabled", fg_color="#334155", font=("Roboto Medium", 14)
         )
         self.main_action_btn.grid(row=0, column=0, padx=10)
 
+        # 2. Finish Button (Initially Hidden)
         self.done_btn = ctk.CTkButton(
             self.btn_row, text="FINISH", command=self.finish_early, 
-            width=140, height=50, corner_radius=25,
+            width=140, height=45, corner_radius=22,
             fg_color="#10b981", hover_color="#059669", font=("Roboto Medium", 14)
         )
+        # We don't grid it yet
         
+        # 3. Cancel Button
         self.cancel_btn = ctk.CTkButton(
             self.btn_row, text="CANCEL", command=self.cancel_session, 
-            width=100, height=50, corner_radius=25,
+            width=100, height=45, corner_radius=22,
             fg_color="transparent", text_color="#ef4444", hover_color="#1e293b",
             font=("Roboto Medium", 13)
         )
         self.cancel_btn.grid(row=0, column=2, padx=10)
 
         # --- 3. TASKS CARD ---
-        # "Floating" Card design with border
+        # Reduced vertical padding to prevent pushing buttons off screen
         self.tasks_container = ctk.CTkFrame(self, fg_color=CARD_COLOR, corner_radius=16, border_width=1, border_color="#334155")
-        self.tasks_container.pack(side="bottom", fill="x", padx=60, pady=40, ipady=10)
+        self.tasks_container.pack(side="bottom", fill="x", padx=60, pady=20, ipady=5)
         
         header_row = ctk.CTkFrame(self.tasks_container, fg_color="transparent")
-        header_row.pack(fill="x", padx=25, pady=(15, 10))
+        header_row.pack(fill="x", padx=25, pady=(10, 5))
         ctk.CTkLabel(header_row, text="SESSION GOALS", font=("Roboto Medium", 12), text_color=TEXT_SEC).pack(side="left")
         
         self.task_scroll = ctk.CTkScrollableFrame(self.tasks_container, height=120, fg_color="transparent")
         self.task_scroll.pack(fill="x", padx=15)
 
         self.update_timer()
+
+    # --- VISIBILITY HELPER ---
+    def update_button_visibility(self):
+        """Ensures the correct buttons are shown based on state"""
+        if self.timer_state == "RUNNING" or self.timer_state == "PAUSED":
+            self.done_btn.grid(row=0, column=1, padx=10)
+            self.cancel_btn.configure(text="CANCEL")
+        elif self.timer_state == "EDITING":
+            self.done_btn.grid_forget()
+            self.cancel_btn.configure(text="CANCEL")
+        elif self.timer_state == "FINISHED":
+            self.done_btn.grid_forget()
+            self.cancel_btn.configure(text="BACK")
 
     # --- LOGIC ---
     def refresh(self):
@@ -110,7 +127,7 @@ class TimerPage(ctk.CTkFrame):
             self.create_task_row(t["text"])
 
     def create_task_row(self, text):
-        row = ctk.CTkFrame(self.task_scroll, fg_color="#0f172a", corner_radius=8) # Darker inner card
+        row = ctk.CTkFrame(self.task_scroll, fg_color="#0f172a", corner_radius=8)
         row.pack(fill="x", pady=4, padx=5)
         
         check_var = ctk.IntVar(value=0)
@@ -159,7 +176,8 @@ class TimerPage(ctk.CTkFrame):
         self.timer_label.configure(text="00:00", text_color="#334155")
         self.main_action_btn.configure(text="START", fg_color="#334155", state="disabled")
         self.hint_label.pack(pady=(0, 10))
-        self.done_btn.grid_forget()
+        
+        self.update_button_visibility() 
         self.refresh() 
 
     def handle_main_button(self):
@@ -172,18 +190,22 @@ class TimerPage(ctk.CTkFrame):
         self.timer_state = "RUNNING"
         self.initial_time = int(self.input_string)
         self.time_left = self.initial_time * 60
+        
         self.hint_label.pack_forget()
         self.timer_label.configure(text_color="white")
         self.main_action_btn.configure(text="PAUSE", fg_color="#f59e0b", hover_color="#d97706")
-        self.done_btn.grid(row=0, column=1, padx=10)
+        
+        self.update_button_visibility() 
 
     def pause_timer(self):
         self.timer_state = "PAUSED"
         self.main_action_btn.configure(text="RESUME", fg_color="#10b981", hover_color="#059669")
+        self.update_button_visibility()
 
     def resume_timer(self):
         self.timer_state = "RUNNING"
         self.main_action_btn.configure(text="PAUSE", fg_color="#f59e0b", hover_color="#d97706")
+        self.update_button_visibility()
 
     def cancel_session(self):
         self.timer_state = "IDLE"
@@ -212,8 +234,7 @@ class TimerPage(ctk.CTkFrame):
     def commit_session(self, duration_mins):
         self.timer_state = "FINISHED"
         self.main_action_btn.configure(text="COMPLETED", fg_color="#334155", state="disabled")
-        self.done_btn.grid_forget()
-        self.cancel_btn.configure(text="BACK")
+        self.update_button_visibility() 
 
         for task_text in self.pending_tasks:
             self.task_manager.mark_done(task_text)
