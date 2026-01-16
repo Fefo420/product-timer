@@ -9,7 +9,7 @@ ctk.set_appearance_mode("Dark")
 # Constants
 GITHUB_USER = "fefo420"
 GITHUB_REPO = "product-timer"  # Your Repository Name
-CURRENT_VERSION = "1.0.0"      # Update this number manually before every build!
+CURRENT_VERSION = "1.0.1"      # Update this number manually before every build!
 
 # URLs (Don't change these, they are automatic)
 # Checks this raw file for the version number "1.0.1" etc.
