@@ -9,20 +9,52 @@ import venv
 VENV_NAME = "build_env"
 
 def check_system_deps():
+    """
+    Checks for system-level dependencies (Tkinter, Venv) and attempts to install them
+    automatically on Linux if they are missing.
+    """
     if platform.system() == "Linux":
         print("🐧 Linux detected. Checking system components...")
+        
+        # 1. Check for Tkinter (GUI Support)
         try:
             import tkinter
-            print("✅ Tkinter is already installed.")
+            print("✅ Tkinter is installed.")
         except ImportError:
-            if shutil.which("apt-get"):
-                try:
-                    subprocess.check_call(['sudo', 'apt-get', 'update'])
-                    subprocess.check_call(['sudo', 'apt-get', 'install', '-y', 'python3-tk'])
-                except subprocess.CalledProcessError:
-                    sys.exit(1)
-            else:
-                sys.exit(1)
+            print("⚠️ Tkinter missing. Attempting to install...")
+            install_linux_package("python3-tk")
+
+        # 2. Check for Ensurepip/Venv (Virtual Environment Support)
+        try:
+            import ensurepip
+            import venv
+            # Just importing isn't enough, sometimes the module exists but is broken
+            # without the system package (common in Ubuntu/Debian).
+            print("✅ Venv/Ensurepip is installed.")
+        except ImportError:
+            print("⚠️ Venv module missing. Attempting to install...")
+            # Detect python version (e.g., "python3.12")
+            py_version = f"python{sys.version_info.major}.{sys.version_info.minor}-venv"
+            install_linux_package(py_version)
+
+def install_linux_package(package_name):
+    """Helper to run apt-get commands safely"""
+    if not shutil.which("apt-get"):
+        print(f"❌ Could not install {package_name}: 'apt-get' not found.")
+        sys.exit(1)
+
+    # Check if we are root (don't use sudo if we are already root)
+    use_sudo = os.geteuid() != 0
+    cmd_prefix = ['sudo'] if use_sudo else []
+
+    try:
+        print(f"📦 Installing {package_name}...")
+        subprocess.check_call(cmd_prefix + ['apt-get', 'update'])
+        subprocess.check_call(cmd_prefix + ['apt-get', 'install', '-y', package_name])
+        print(f"✅ Installed {package_name} successfully.")
+    except subprocess.CalledProcessError:
+        print(f"❌ Failed to install {package_name}. Please install it manually.")
+        sys.exit(1)
 
 def get_venv_python():
     if platform.system() == "Windows":
@@ -37,9 +69,21 @@ def get_venv_pip():
         return os.path.abspath(os.path.join(VENV_NAME, "bin", "pip"))
 
 def setup_virtual_env():
+    # Detect if we need to recreate the environment
+    if os.path.exists(VENV_NAME):
+        # Optional: Check if the existing venv is broken
+        if not os.path.exists(get_venv_python()):
+            print("⚠️ Existing venv seems broken. Recreating...")
+            shutil.rmtree(VENV_NAME)
+    
     if not os.path.exists(VENV_NAME):
         print(f"📦 Creating isolated environment '{VENV_NAME}'...")
-        venv.create(VENV_NAME, with_pip=True)
+        try:
+            venv.create(VENV_NAME, with_pip=True)
+        except Exception as e:
+            print(f"❌ Failed to create venv: {e}")
+            print("💡 Try running: sudo apt install python3-venv")
+            sys.exit(1)
 
 def install_dependencies():
     # Force reinstall to ensure fresh files
@@ -73,9 +117,7 @@ def build_executable():
         f"--name={app_name}",
         "--clean",
         "--windowed",
-        # 🟢 FIX 1: Automatically find ALL customtkinter files (themes/fonts/json)
         "--collect-all", "customtkinter",
-        # 🟢 FIX 2: Force include the missing text libraries
         "--hidden-import", "unicodedata",
         "--hidden-import", "idna",
     ]
@@ -101,12 +143,14 @@ def build_executable():
 
 if __name__ == "__main__":
     try:
-        # 🟢 CLEAN SLATE: Nuke everything to prevent "Zombie" builds
+        # CLEAN SLATE: Nuke everything to prevent "Zombie" builds
         if os.path.exists("build"): shutil.rmtree("build")
         if os.path.exists("dist"): shutil.rmtree("dist")
         if os.path.exists("FocusTimer.spec"): os.remove("FocusTimer.spec")
         
+        # 🟢 Run the new robust checks
         check_system_deps()
+        
         setup_virtual_env()
         install_dependencies()
         build_executable()
