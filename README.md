@@ -1,6 +1,9 @@
 UPDATES ON APP ARE AVAILABLE NOW!
 
-0. Make sure u have python installed
+Windows install tutorial:
+download the .exe from the releases tab(on the right)
+
+mac/linux install tutorial:
 1. Open a terminal
 2. using the terminal go to your product-timer folder
 3. open timer
