@@ -1,11 +1,15 @@
-import flet as ft
-from datetime import datetime
-import sys
 import os
-import threading
+import sys
 import time
+import threading
+from datetime import datetime
+import flet as ft
 
-# Ensure the root directory is accessible
+# 🟢 RENDER FIX: Force software rendering for Windows to avoid the grey box
+if sys.platform == "win32":
+    os.environ["FLET_RENDERER_TYPE"] = "software"
+
+# Path setup to find the shared 'core' folder
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
@@ -14,20 +18,19 @@ if parent_dir not in sys.path:
 from core.data_manager import TaskManager 
 
 def main(page: ft.Page):
-    # 📱 Responsive Window Settings
+    # 📱 Window Configuration
+    page.title = "Focus Station"
     page.window.width = 380
     page.window.height = 720
-    page.window.resizable = False
-    page.title = "Focus Station"
-    page.bgcolor = "#0f172a" # Matches BG_COLOR
+    page.bgcolor = "#0f172a"  # Matches desktop BG_COLOR
     page.theme_mode = ft.ThemeMode.DARK
-    page.padding = 10
+    page.padding = 20
     
+    # Initialize the shared data manager
     manager = TaskManager(username="MobileUser")
-
-    # --- TIMER LOGIC ---
     timer_data = {"running": False, "seconds": 1500}
 
+    # --- TIMER LOGIC ---
     def format_time(s):
         mins, secs = divmod(s, 60)
         return f"{mins:02d}:{secs:02d}"
@@ -37,7 +40,6 @@ def main(page: ft.Page):
             time.sleep(1)
             timer_data["seconds"] -= 1
             timer_text.value = format_time(timer_data["seconds"])
-            progress_ring.value = timer_data["seconds"] / 1500
             page.update()
         
         if timer_data["seconds"] == 0:
@@ -56,73 +58,66 @@ def main(page: ft.Page):
         page.update()
 
     # --- UI COMPONENTS ---
-    timer_text = ft.Text(format_time(timer_data["seconds"]), size=36, weight="bold")
+    # Using white for high visibility on the dark background
+    timer_text = ft.Text("25:00", size=48, weight="bold", color="white")
     
-    progress_ring = ft.ProgressRing(
-        value=1.0, stroke_width=6, width=130, height=130, color="#6366f1" # ACCENT_COLOR
-    )
-
+    # Standard button for session control
     start_btn = ft.FilledButton(
-        content=ft.Text("START SESSION", weight="bold"), 
+        content=ft.Text("START SESSION", weight="bold"),
         on_click=toggle_timer,
         style=ft.ButtonStyle(bgcolor="#6366f1", color="white"),
-        width=220
+        width=250
     )
 
     task_input = ft.TextField(
-        label="New goal...", 
-        expand=True, 
-        height=48, 
-        text_size=14,
-        bgcolor="#1e293b", # CARD_COLOR
-        border_radius=10,
-        on_submit=lambda _: refresh_tasks()
+        label="Add a task...", 
+        bgcolor="#1e293b", # Matches desktop CARD_COLOR
+        expand=True,
+        on_submit=lambda _: add_task()
     )
     
-    tasks_column = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=5)
+    tasks_list = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
 
-    def refresh_tasks(e=None):
-        tasks_column.controls.clear()
+    def add_task():
+        if not task_input.value: return
+        # Save task using shared logic from core
         date_key = manager.get_key(datetime.now())
-        tasks = manager.load_data().get(date_key, [])
+        data = manager.load_data()
+        tasks = data.get(date_key, [])
+        tasks.append({"text": task_input.value, "done": False})
+        data[date_key] = tasks
+        manager.save_data(data)
+        
+        task_input.value = ""
+        refresh_tasks()
+
+    def refresh_tasks():
+        tasks_list.controls.clear()
+        # Load tasks from the shared JSON file
+        data = manager.load_data()
+        date_key = manager.get_key(datetime.now())
+        tasks = data.get(date_key, [])
         for t in tasks:
             if not t.get("done", False):
-                tasks_column.controls.append(
-                    ft.Checkbox(label=t["text"], label_style=ft.TextStyle(size=14))
-                )
+                tasks_list.controls.append(ft.Checkbox(label=t["text"]))
         page.update()
 
-    # --- LAYOUT ASSEMBLY ---
+    # --- LAYOUT ---
     page.add(
-        ft.Container(
-            content=ft.Column([
-                ft.Text("FOCUS STATION", size=18, weight="bold", color="#6366f1"),
-                ft.Stack([
-                    progress_ring,
-                    # 🟢 FIXED: Using string "center" instead of ft.alignment.center
-                    ft.Container(content=timer_text, alignment="center", width=130, height=130)
-                ], alignment="center"),
-                start_btn,
-                ft.Divider(height=20, color="#334155"),
-                ft.Row([
-                    task_input, 
-                    ft.IconButton(icon="add", icon_color="#6366f1", on_click=refresh_tasks)
-                ]),
-                ft.Text("TODAY'S TASKS", size=11, color="#94a3b8", weight="bold"),
-                ft.Container(
-                    content=tasks_column,
-                    expand=True,
-                    bgcolor="#020617", # SIDEBAR_COLOR
-                    padding=10,
-                    border_radius=12
-                )
-            ], horizontal_alignment="center", spacing=15),
-            expand=True
-        )
+        ft.Text("FOCUS STATION", size=20, weight="bold", color="#6366f1"),
+        ft.Divider(height=20, color="transparent"),
+        # 🟢 FIXED: Using string "center" to avoid alignment errors
+        ft.Container(content=timer_text, alignment=ft.alignment.Alignment(0, 0)),
+        ft.Row([start_btn], alignment=ft.MainAxisAlignment.CENTER),
+        ft.Divider(height=20),
+        ft.Row([task_input, ft.IconButton(icon="add", on_click=lambda _: add_task())]),
+        ft.Text("TODAY'S GOALS", size=12, color="gray", weight="bold"),
+        tasks_list
     )
-    
+
+    # Initial load of tasks
     refresh_tasks()
 
 if __name__ == "__main__":
-    # 🟢 FIXED: Modern syntax to avoid DeprecationWarning
-    ft.app(main)
+    # 🟢 FIXED: Using target=main to match the latest Flet expectations
+    ft.app(target=main)
