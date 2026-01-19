@@ -3,6 +3,16 @@ import sys
 import subprocess
 import platform
 import shutil
+import venv
+
+VENV_NAME = "mobile_env"
+
+def get_venv_executable(name):
+    """Returns the path to an executable inside the venv (cross-platform)."""
+    if platform.system() == "Windows":
+        return os.path.abspath(os.path.join(VENV_NAME, "Scripts", f"{name}.exe"))
+    else:
+        return os.path.abspath(os.path.join(VENV_NAME, "bin", name))
 
 def check_system_deps():
     """Checks for Arch Linux and Debian dependencies needed for Flet."""
@@ -11,34 +21,49 @@ def check_system_deps():
 
     print("🐧 Linux detected. Checking system display drivers...")
     
-    # Check for Arch specifically
     is_arch = os.path.exists("/etc/arch-release")
-    
-    # Required system libraries for Flet/Flutter rendering on Linux
-    deps = ["libgtk-3-dev", "libgst-full-1.0"] if not is_arch else ["gtk3", "gst-plugins-good"]
     
     if is_arch:
         print("💡 ARCH USER DETECTED. If the app fails to open, run:")
-        print("   sudo pacman -S gtk3 gst-plugins-good python-pip")
+        print("   sudo pacman -S gtk3 gst-plugins-good python")
     else:
         print("💡 DEBIAN/UBUNTU USER DETECTED. Run if needed:")
         print("   sudo apt install libgtk-3-0 libgst-full-1.0")
 
+def setup_virtual_env():
+    """Creates the virtual environment if it doesn't exist."""
+    python_exe = get_venv_executable("python")
+    
+    # Self-healing: Remove broken venv
+    if os.path.exists(VENV_NAME) and not os.path.exists(python_exe):
+        print("🧹 Removing broken virtual environment...")
+        shutil.rmtree(VENV_NAME)
+    
+    if not os.path.exists(VENV_NAME):
+        print(f"📦 Creating virtual environment '{VENV_NAME}'...")
+        try:
+            venv.create(VENV_NAME, with_pip=True)
+            print("✅ Virtual environment created.")
+        except Exception as e:
+            print(f"❌ Failed to create venv: {e}")
+            sys.exit(1)
+
 def setup_python_deps():
-    """Ensures all required Python libraries are installed."""
-    print("🔍 Validating Python libraries...")
+    """Installs all required Python libraries inside the venv."""
+    print("🔍 Installing Python libraries in virtual environment...")
     required = ["flet", "requests", "packaging"]
     
+    pip_exe = get_venv_executable("pip")
+    
     try:
-        # Use the current python executable to install
-        subprocess.check_call([sys.executable, "-m", "pip", "install"] + required)
+        subprocess.check_call([pip_exe, "install"] + required)
         print("✅ Python libraries ready.")
     except Exception as e:
         print(f"❌ Failed to install libraries: {e}")
+        sys.exit(1)
 
 def run_mobile_test():
-    """Ensures paths are correct and launches the mobile app."""
-    # Add root to PYTHONPATH so 'core' is found correctly
+    """Launches the mobile app using the venv's Python."""
     env = os.environ.copy()
     root_dir = os.path.abspath(os.path.dirname(__file__))
     
@@ -53,15 +78,18 @@ def run_mobile_test():
         print(f"❌ Error: Could not find {mobile_script}")
         return
 
+    # Use the venv's Python, not system Python
+    python_exe = get_venv_executable("python")
+    
     print(f"🚀 Launching Mobile App from {mobile_script}...")
     try:
-        # Launching with the modified environment to ensure 'core' is visible
-        subprocess.run([sys.executable, mobile_script], env=env)
+        subprocess.run([python_exe, mobile_script], env=env)
     except KeyboardInterrupt:
         print("\n🛑 App closed.")
 
 if __name__ == "__main__":
     print("=== FOCUS STATION MOBILE SETUP & TEST ===")
     check_system_deps()
-    setup_python_deps()
-    run_mobile_test()
+    setup_virtual_env()    # NEW: Create venv first
+    setup_python_deps()     # Install into venv
+    run_mobile_test()       # Run using venv's python
