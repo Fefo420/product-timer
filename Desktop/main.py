@@ -68,6 +68,7 @@ import config
 from view_tasks import TaskManager
 from view_ui import MainUI
 from updater import AppUpdater
+from core.task_manager import TaskManager
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("dark-blue")
