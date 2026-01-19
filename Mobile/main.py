@@ -15,7 +15,7 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 20
 
-    # Initialize Logic with a default user (Mobile needs a login screen later!)
+    # Initialize Logic
     manager = TaskManager(username="MobileUser")
 
     # 2. UI Elements
@@ -69,7 +69,7 @@ def main(page: ft.Page):
 
     # 3. Build Layout
     add_btn = ft.IconButton(
-        icon=ft.icons.ADD_CIRCLE, 
+        icon="add",                 
         icon_color="#6366f1", 
         icon_size=40, 
         on_click=add_task
@@ -80,7 +80,7 @@ def main(page: ft.Page):
             [
                 ft.Text("FOCUS STATION", size=20, weight="bold", color="white"),
                 ft.Container(expand=True), # Spacer
-                ft.Icon(ft.icons.TIMER, color="#6366f1")
+                ft.Icon("access_time", color="#6366f1") # FIXED: No 'name='
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN
         ),
@@ -92,4 +92,5 @@ def main(page: ft.Page):
 
     refresh_tasks()
 
+# Use standard launch
 ft.app(target=main)
